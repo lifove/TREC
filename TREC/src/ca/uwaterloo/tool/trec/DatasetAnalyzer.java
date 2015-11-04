@@ -29,14 +29,14 @@ public class DatasetAnalyzer {
 		
 		for(String srcFile:sources.keySet()){
 			if(isSameAttributes(tarInstances,sources.get(srcFile))){
-				computeSimilarutyOfHomogeneousDatasets(tarInstances,sources.get(srcFile));
+				computeSimilarityOfHomogeneousDatasets(tarInstances,sources.get(srcFile));
 			}
 		}
 		
 		return scores;
 	}
 
-	private void computeSimilarutyOfHomogeneousDatasets(Instances tarInstances,
+	private void computeSimilarityOfHomogeneousDatasets(Instances tarInstances,
 			Instances srcInstances) {
 		
 		// use KS-test
