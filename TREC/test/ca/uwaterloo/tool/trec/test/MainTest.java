@@ -10,7 +10,7 @@ public class MainTest {
 
 	@Test
 	public void test() {
-		String[] args={"-file", "data/Relink/Apache.arff", "-labelinfo", "buggy","-source", "data"};
+		String[] args={"-file", "data/Relink/Apache.arff", "-labelinfo", "buggy","-source", "data/source"};
 		Main.main(args);
 	}
 
