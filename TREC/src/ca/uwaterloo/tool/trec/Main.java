@@ -42,7 +42,12 @@ public class Main {
 		instances = preprocessing(instances);
 		
 		// identify the best sources
+		DatasetAnalyzer da = new DatasetAnalyzer(instances,sources);
+		HashMap<String,Double> scores = da.similarityScores;
 		
+		for(String srcFile:scores.keySet()){
+			System.out.println(srcFile + " similarity=" + scores.get(srcFile));
+		}
 		
 		// compute precision recall curve and AUCEC
 		
