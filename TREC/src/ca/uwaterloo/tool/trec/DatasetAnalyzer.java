@@ -1,5 +1,9 @@
 package ca.uwaterloo.tool.trec;
 
+import hk.ust.cse.ipam.utils.ArrayListUtil;
+import hk.ust.cse.ipam.utils.HashMapUtil;
+
+import java.util.ArrayList;
 import java.util.HashMap;
 
 import org.rosuda.REngine.REXPMismatchException;
@@ -23,11 +27,13 @@ public class DatasetAnalyzer {
 		tarInsts = tarInstances;
 		sourceDatasets = sources;
 		
+	}
+	
+	void analyze(){
 		// compute similarity scores
 		similarityScores = getSimilarityScore(tarInsts,sourceDatasets);
 		
-		// order similarity scores or get top n datasets
-		
+		// order similarity scores or get top n datasets		
 	}
 	
 	HashMap<String,Double> getSimilarityScore(Instances tarInstances,HashMap<String,Instances> sources){
@@ -39,6 +45,10 @@ public class DatasetAnalyzer {
 				Double score = computeSimilarityOfHomogeneousDatasets(tarInstances,sources.get(srcFile));
 				scores.put(srcFile, score);
 			}
+			
+			// conduct Heterogeneous computation for all datasets including the datasets with the same attributes
+			Double score = computeSimilarityOfHeterogeneousDatasets(tarInstances,sources.get(srcFile));
+			scores.put(srcFile + "(H)", score);
 		}
 		
 		return scores;
@@ -65,6 +75,58 @@ public class DatasetAnalyzer {
 		}
 
 		return sumPValues/(tarInstances.numAttributes()-1);
+	}
+	
+	private Double computeSimilarityOfHeterogeneousDatasets(Instances tarInstances,
+			Instances srcInstances) {
+
+		HashMap<String,Double> matchedPValues = new HashMap<String,Double>(); // src-tgt , pValue
+
+		// use KS-test, compute all matching scores
+		for(int tarAttrIdx = 0; tarAttrIdx < tarInstances.numAttributes();tarAttrIdx++){
+		
+			// skip the last (class) attribute
+			if(tarAttrIdx==tarInstances.classIndex())
+				continue;
+			
+			for(int srcAttrIdx = 0; srcAttrIdx < srcInstances.numAttributes();srcAttrIdx++){
+				
+				// skip the last (class) attribute
+				if(srcAttrIdx==srcInstances.classIndex())
+					continue;
+				
+				double[] tarAttrValues = tarInstances.attributeToDoubleArray(tarAttrIdx);
+				double[] srcAttrValues = srcInstances.attributeToDoubleArray(tarAttrIdx);
+				
+				double pValue= getKSPvalueFromR(srcAttrValues, tarAttrValues);
+				
+				matchedPValues.put(srcAttrIdx + "-" + tarAttrIdx,pValue);
+			}
+		}
+
+		// find the best matching by a simple greedy approach
+		// sort HashMap
+		matchedPValues = (HashMap<String, Double>) HashMapUtil.sortByValue(matchedPValues);
+		
+		ArrayList<Integer> matchedSrcAttrIdx = new ArrayList<Integer>();
+		ArrayList<Integer> matchedTarAttrIdx = new ArrayList<Integer>();
+		ArrayList<Double> pValues = new ArrayList<Double>(); 
+		for(String key:matchedPValues.keySet()){
+			String[] srcTarAttrIdices = key.split("-");
+			int srcAttrIdx = Integer.parseInt(srcTarAttrIdices[0]);
+			int tarAttrIdx = Integer.parseInt(srcTarAttrIdices[1]);
+			
+			if(matchedSrcAttrIdx.contains(srcAttrIdx) || matchedTarAttrIdx.contains(tarAttrIdx))
+				continue;
+			
+			matchedSrcAttrIdx.add(srcAttrIdx);
+			matchedTarAttrIdx.add(tarAttrIdx);
+			pValues.add(matchedPValues.get(key));
+		}
+		
+		ArrayListUtil.getAverage(pValues);
+		
+		return ArrayListUtil.getAverage(pValues);
 	}
 
 	// to user Rserve only once, make this method as static.

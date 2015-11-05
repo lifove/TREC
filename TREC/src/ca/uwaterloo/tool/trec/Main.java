@@ -43,6 +43,7 @@ public class Main {
 		
 		// identify the best sources
 		DatasetAnalyzer da = new DatasetAnalyzer(instances,sources);
+		da.analyze();
 		HashMap<String,Double> scores = da.similarityScores;
 		
 		for(String srcFile:scores.keySet()){
@@ -91,7 +92,7 @@ public class Main {
 	String file;
 	String lableInfo;
 	String source;
-	String experimental;
+	Boolean experimental;
 	
 	void parseOptions(Options options,String[] args){
 
@@ -107,7 +108,7 @@ public class Main {
 
 			source = cmd.getOptionValue("source"); // to get all files under the directory
 
-			experimental = cmd.getOptionValue("experimental");
+			experimental = cmd.hasOption("experimental");
 
 
 		} catch (ParseException e) {
