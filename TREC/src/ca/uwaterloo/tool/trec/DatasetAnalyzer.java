@@ -19,8 +19,7 @@ public class DatasetAnalyzer {
 	Instances tarInsts,tarTrain;
 	HashMap<String,Instances> sourceDatasets;
 	HashMap<String,Double> similarityScores;
-	
-	String[] buggyLabels = {"buggy","TRUE"};
+	HashMap<String,HashMap<String,Double>> allFinallyMatchedAttributes = new HashMap<String,HashMap<String,Double>>(); // key: srcName, value: finallyMatchedAttributes
 	
 	DatasetAnalyzer(Instances tarInstances,HashMap<String,Instances> sources){
 		
@@ -42,25 +41,26 @@ public class DatasetAnalyzer {
 		for(String srcFile:sources.keySet()){
 				
 			if(isSameAttributes(tarInstances,sources.get(srcFile))){
-				Double score = computeSimilarityOfHomogeneousDatasets(tarInstances,sources.get(srcFile));
+				Double score = computeSimilarityOfHomogeneousDatasets(srcFile, tarInstances,sources.get(srcFile));
 				scores.put(srcFile, score);
 			}
 			
 			// conduct Heterogeneous computation for all datasets including the datasets with the same attributes
-			Double score = computeSimilarityOfHeterogeneousDatasets(tarInstances,sources.get(srcFile));
+			Double score = computeSimilarityOfHeterogeneousDatasets(srcFile + "(H)", tarInstances,sources.get(srcFile));
 			scores.put(srcFile + "(H)", score);
 		}
 		
 		return scores;
 	}
 
-	private Double computeSimilarityOfHomogeneousDatasets(Instances tarInstances,
+	private Double computeSimilarityOfHomogeneousDatasets(String srcName, Instances tarInstances,
 			Instances srcInstances) {
 
 		Double sumPValues = 0.0;
 		
 		// use KS-test
 		int count = 0;
+		HashMap<String,Double> finallyMatchedAttributes = new HashMap<String,Double>();
 		for(int attrIdx = 0; attrIdx < tarInstances.numAttributes();attrIdx++){
 		
 			// skip the last (class) attribute
@@ -73,11 +73,14 @@ public class DatasetAnalyzer {
 			double pValue= getKSPvalueFromR(srcAttrValues, tarAttrValues);
 			
 			if(pValue>0.05){
+				finallyMatchedAttributes.put(attrIdx +"-"+attrIdx,pValue);
 				sumPValues+=pValue;
 				count++;
 			}
 			
 		}
+		
+		allFinallyMatchedAttributes.put(srcName, finallyMatchedAttributes);
 		
 		if(count==0)
 			return -1.0;
@@ -85,7 +88,7 @@ public class DatasetAnalyzer {
 		return sumPValues/count++;
 	}
 	
-	private Double computeSimilarityOfHeterogeneousDatasets(Instances tarInstances,
+	private Double computeSimilarityOfHeterogeneousDatasets(String srcName, Instances tarInstances,
 			Instances srcInstances) {
 
 		HashMap<String,Double> matchedPValues = new HashMap<String,Double>(); // src-tgt , pValue
@@ -116,6 +119,10 @@ public class DatasetAnalyzer {
 		// sort HashMap
 		matchedPValues = (HashMap<String, Double>) HashMapUtil.sortByValue(matchedPValues);
 		
+		
+		HashMap<String,Double> finallyMatchedAttributes = new HashMap<String,Double>();
+		
+		// to keep indices already matched
 		ArrayList<Integer> matchedSrcAttrIdx = new ArrayList<Integer>();
 		ArrayList<Integer> matchedTarAttrIdx = new ArrayList<Integer>();
 		ArrayList<Double> pValues = new ArrayList<Double>(); 
@@ -128,11 +135,16 @@ public class DatasetAnalyzer {
 				continue;
 			
 			if(matchedPValues.get(key)>0.05){
+				double pValue = matchedPValues.get(key);
 				matchedSrcAttrIdx.add(srcAttrIdx);
 				matchedTarAttrIdx.add(tarAttrIdx);
-				pValues.add(matchedPValues.get(key));
+				pValues.add(pValue);
+				
+				finallyMatchedAttributes.put(srcAttrIdx + "-" + tarAttrIdx,pValue);
 			}
 		}
+		
+		allFinallyMatchedAttributes.put(srcName, finallyMatchedAttributes);
 		
 		if(pValues.size()==0)
 			return -1.0;

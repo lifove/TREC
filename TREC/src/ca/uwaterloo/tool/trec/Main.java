@@ -1,6 +1,7 @@
 package ca.uwaterloo.tool.trec;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Random;
 
@@ -46,7 +47,7 @@ public class Main {
 		// load a test set
 		Instances instances = WekaUtils.loadArff(file);
 		
-		// load a pool of sources
+		// load a pool of sources, exclude the test set
 		HashMap<String,Instances> sources = WekaUtils.loadArffs(source,file);
 		
 		// if experimental, repeat n-fold cross validation for 
@@ -85,13 +86,42 @@ public class Main {
 		
 		// sort
 		scores = (HashMap<String, Double>) HashMapUtil.sortByValue(scores);
-				
+		
+		// build a model using each similar src dataset and test the model on the target dataset
+		// compute precision-recall curve, AUCEC
+		// generate TREC table
 		for(String srcFile:scores.keySet()){
+			
+			// consider only average score is > 0. Others will have > 0.05 since KS cutoff is 0.05
+			if(scores.get(srcFile)<0)
+				continue;
+			
 			System.out.println(srcFile + " similarity=" + scores.get(srcFile));
+			
+			// generate new src and tar datasets using matched attributes
+			
+			// (1) get a list of src and tar attribute indice matched
+			
+			ArrayList<Integer> srcSelectedIndice = new ArrayList<Integer>();
+			ArrayList<Integer> tarSelectedIndice = new ArrayList<Integer>();
+			for(String matchedAttribute:da.allFinallyMatchedAttributes.get(srcFile).keySet()){
+				
+				String[] indices = matchedAttribute.split("-");
+				
+				srcSelectedIndice.add(Integer.parseInt(indices[0]));
+				tarSelectedIndice.add(Integer.parseInt(indices[1]));
+				
+			}
+			
+			Instances src = sources.get(srcFile);
+			src = WekaUtils.getInstancesWithSelectedAttributes(src, srcSelectedIndice, WekaUtils.getPosLabel(src));
+			Instances tar = WekaUtils.getInstancesWithSelectedAttributes(instances, tarSelectedIndice, WekaUtils.getPosLabel(instances));
+			
+			// TODO build model
+			
+			// compute precision recall curve and AUCEC
+			
 		}
-		
-		// compute precision recall curve and AUCEC
-		
 		
 		// generate TREC table
 	}
