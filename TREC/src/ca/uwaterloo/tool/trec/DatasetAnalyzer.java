@@ -60,6 +60,7 @@ public class DatasetAnalyzer {
 		Double sumPValues = 0.0;
 		
 		// use KS-test
+		int count = 0;
 		for(int attrIdx = 0; attrIdx < tarInstances.numAttributes();attrIdx++){
 		
 			// skip the last (class) attribute
@@ -70,11 +71,18 @@ public class DatasetAnalyzer {
 			double[] srcAttrValues = srcInstances.attributeToDoubleArray(attrIdx);
 			
 			double pValue= getKSPvalueFromR(srcAttrValues, tarAttrValues);
-			sumPValues+=pValue;
+			
+			if(pValue>0.05){
+				sumPValues+=pValue;
+				count++;
+			}
 			
 		}
+		
+		if(count==0)
+			return -1.0;
 
-		return sumPValues/(tarInstances.numAttributes()-1);
+		return sumPValues/count++;
 	}
 	
 	private Double computeSimilarityOfHeterogeneousDatasets(Instances tarInstances,
@@ -119,12 +127,15 @@ public class DatasetAnalyzer {
 			if(matchedSrcAttrIdx.contains(srcAttrIdx) || matchedTarAttrIdx.contains(tarAttrIdx))
 				continue;
 			
-			matchedSrcAttrIdx.add(srcAttrIdx);
-			matchedTarAttrIdx.add(tarAttrIdx);
-			pValues.add(matchedPValues.get(key));
+			if(matchedPValues.get(key)>0.05){
+				matchedSrcAttrIdx.add(srcAttrIdx);
+				matchedTarAttrIdx.add(tarAttrIdx);
+				pValues.add(matchedPValues.get(key));
+			}
 		}
 		
-		ArrayListUtil.getAverage(pValues);
+		if(pValues.size()==0)
+			return -1.0;
 		
 		return ArrayListUtil.getAverage(pValues);
 	}

@@ -2,6 +2,7 @@ package ca.uwaterloo.tool.trec;
 
 import java.util.HashMap;
 
+import hk.ust.cse.ipam.utils.HashMapUtil;
 import hk.ust.cse.ipam.utils.WekaUtils;
 
 import org.apache.commons.cli.CommandLine;
@@ -45,6 +46,8 @@ public class Main {
 		DatasetAnalyzer da = new DatasetAnalyzer(instances,sources);
 		da.analyze();
 		HashMap<String,Double> scores = da.similarityScores;
+		// sort
+		scores = (HashMap<String, Double>) HashMapUtil.sortByValue(scores);
 		
 		for(String srcFile:scores.keySet()){
 			System.out.println(srcFile + " similarity=" + scores.get(srcFile));
