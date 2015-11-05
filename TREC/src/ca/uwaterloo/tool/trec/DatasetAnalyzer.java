@@ -16,7 +16,7 @@ import weka.core.Instances;
 
 public class DatasetAnalyzer {
 	
-	Instances tarInsts;
+	Instances tarInsts,tarTrain;
 	HashMap<String,Instances> sourceDatasets;
 	HashMap<String,Double> similarityScores;
 	
@@ -28,7 +28,7 @@ public class DatasetAnalyzer {
 		sourceDatasets = sources;
 		
 	}
-	
+
 	void analyze(){
 		// compute similarity scores
 		similarityScores = getSimilarityScore(tarInsts,sourceDatasets);

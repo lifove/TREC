@@ -1,6 +1,8 @@
 package ca.uwaterloo.tool.trec;
 
+import java.io.File;
 import java.util.HashMap;
+import java.util.Random;
 
 import hk.ust.cse.ipam.utils.HashMapUtil;
 import hk.ust.cse.ipam.utils.WekaUtils;
@@ -28,6 +30,14 @@ public class Main {
 		new Main().run(args);
 		
 	}
+	
+	
+	String file;
+	String lableInfo;
+	String source;
+	Boolean experimental;
+	int repeat =1;
+	int folds = 2;
 
 	private void run(String[] args) {
 		
@@ -37,8 +47,34 @@ public class Main {
 		Instances instances = WekaUtils.loadArff(file);
 		
 		// load a pool of sources
-		HashMap<String,Instances> sources = WekaUtils.loadArffs(source);
+		HashMap<String,Instances> sources = WekaUtils.loadArffs(source,file);
 		
+		// if experimental, repeat n-fold cross validation for 
+		if(experimental){
+			for(int i=0; i<repeat; i++){
+
+				// randomize with different seed for each iteration
+				instances.randomize(new Random(i)); 
+				instances.stratify(folds);
+				
+				for(int n=0;n < folds;n++){
+					
+					Instances tarTrain = instances.trainCV(folds, n);
+					Instances tarTest = instances.testCV(folds, n);
+					
+					sources.put(new File(file).getName(), tarTrain);
+					
+					generateTRECTable(sources,tarTest);
+					
+				}
+			}
+		}else{
+			generateTRECTable(sources,instances);
+		}
+	}
+	
+	private void generateTRECTable(HashMap<String,Instances> sources,Instances instances){
+				
 		// preprocessing
 		instances = preprocessing(instances);
 		
@@ -46,17 +82,18 @@ public class Main {
 		DatasetAnalyzer da = new DatasetAnalyzer(instances,sources);
 		da.analyze();
 		HashMap<String,Double> scores = da.similarityScores;
+		
 		// sort
 		scores = (HashMap<String, Double>) HashMapUtil.sortByValue(scores);
-		
+				
 		for(String srcFile:scores.keySet()){
 			System.out.println(srcFile + " similarity=" + scores.get(srcFile));
 		}
 		
 		// compute precision recall curve and AUCEC
 		
+		
 		// generate TREC table
-
 	}
 
 	private Instances preprocessing(Instances instances) {
@@ -91,11 +128,6 @@ public class Main {
 			parseOptions(options, args);
 
 	}
-	
-	String file;
-	String lableInfo;
-	String source;
-	Boolean experimental;
 	
 	void parseOptions(Options options,String[] args){
 
