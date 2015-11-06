@@ -1,10 +1,13 @@
 package ca.uwaterloo.tool.trec;
 
 import java.io.File;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Random;
 
+import hk.ust.cse.ipam.utils.ArrayListUtil;
+import hk.ust.cse.ipam.utils.DecimalUtil;
 import hk.ust.cse.ipam.utils.HashMapUtil;
 import hk.ust.cse.ipam.utils.WekaUtils;
 
@@ -15,7 +18,11 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 
+import weka.classifiers.AbstractClassifier;
+import weka.classifiers.Classifier;
+import weka.classifiers.Evaluation;
 import weka.core.Instances;
+import weka.core.Utils;
 
 public class Main {
 
@@ -39,6 +46,7 @@ public class Main {
 	Boolean experimental;
 	int repeat =1;
 	int folds = 2;
+	String mlAlgorithm = "weka.classifiers.functions.Logistic";
 
 	private void run(String[] args) {
 		
@@ -113,14 +121,103 @@ public class Main {
 				
 			}
 			
-			Instances src = sources.get(srcFile);
+			Instances src = sources.get(srcFile.replace("(H)","")); // to get the original data
 			src = WekaUtils.getInstancesWithSelectedAttributes(src, srcSelectedIndice, WekaUtils.getPosLabel(src));
 			Instances tar = WekaUtils.getInstancesWithSelectedAttributes(instances, tarSelectedIndice, WekaUtils.getPosLabel(instances));
 			
-			// TODO build model
-			
-			// compute precision recall curve and AUCEC
-			
+			// build model
+			int posClassValueIndex = WekaUtils.getClassValueIndex(tar, WekaUtils.strPos);
+			Classifier classifier;
+			try {
+				classifier = (Classifier) Utils.forName(Classifier.class, mlAlgorithm, null);
+				Classifier clsCopy = AbstractClassifier.makeCopy(classifier);
+				clsCopy.buildClassifier(src);
+				
+				// evaluate the model on itself to get precision-recall curve
+				Evaluation eval = new Evaluation(src);
+				eval.evaluateModel(clsCopy, src);
+				Instances curve = WekaUtils.getCurve(eval.predictions(), posClassValueIndex);
+				ArrayList<String> predictionResults = WekaUtils.getPrecisionRecallFmeasureFromCurve(curve);
+				
+				// compute src's precision recall curve and AUCEC
+				System.out.println("Source best results by P, R, F1");
+				
+				ThresholdManager tmForSrc = new ThresholdManager(predictionResults);
+				
+				Measure bestPrecisionResult = tmForSrc.processResultsToGetBestInfo(tmForSrc.IDX_PRECISON);
+				Measure bestRecallResult = tmForSrc.processResultsToGetBestInfo(tmForSrc.IDX_RECALL);
+				Measure bestF1Result = tmForSrc.processResultsToGetBestInfo(tmForSrc.IDX_F1);
+				
+				System.out.println(DecimalUtil.threeDecimal(bestPrecisionResult.getPrecision()) + "," + 
+									DecimalUtil.threeDecimal(bestPrecisionResult.getRecall()) + "," +
+									DecimalUtil.threeDecimal(bestPrecisionResult.getF1()) + "," +
+									DecimalUtil.threeDecimal(bestPrecisionResult.getThreshold()));
+				System.out.println(DecimalUtil.threeDecimal(bestRecallResult.getPrecision()) + "," + 
+									DecimalUtil.threeDecimal(bestRecallResult.getRecall()) + "," +
+									DecimalUtil.threeDecimal(bestRecallResult.getF1()) + "," +
+									DecimalUtil.threeDecimal(bestRecallResult.getThreshold()));
+				System.out.println(DecimalUtil.threeDecimal(bestF1Result.getPrecision()) + "," + 
+									DecimalUtil.threeDecimal(bestF1Result.getRecall()) + "," +
+									DecimalUtil.threeDecimal(bestF1Result.getF1()) + "," +
+									DecimalUtil.threeDecimal(bestF1Result.getThreshold()) + "\n");
+				
+				
+				// evaluate the model on the target set
+				Evaluation eval2 = new Evaluation(src);
+				eval2.evaluateModel(clsCopy, tar);
+				curve = WekaUtils.getCurve(eval2.predictions(), posClassValueIndex);
+				predictionResults = WekaUtils.getPrecisionRecallFmeasureFromCurve(curve);
+				
+				// compute tar's precision recall curve and AUCEC
+				
+				System.out.println("===Target results");
+				
+				ThresholdManager tmforTar = new ThresholdManager(predictionResults);
+				
+				Measure resultBySrcBestPrecisionUsingThdValue = tmforTar.getResultByThreshold(bestPrecisionResult.getThreshold());
+				Measure resultBySrcBestRecallUsingThdValue = tmforTar.getResultByThreshold(bestRecallResult.getThreshold());
+				Measure resultBySrcBestF1UsingThdValue = tmforTar.getResultByThreshold(bestF1Result.getThreshold());
+				
+				System.out.println("Target results when using the best P, R, F1 thresholds from source");
+				
+				System.out.println(DecimalUtil.threeDecimal(resultBySrcBestPrecisionUsingThdValue.getPrecision()) + "," + 
+						DecimalUtil.threeDecimal(resultBySrcBestPrecisionUsingThdValue.getRecall()) + "," +
+						DecimalUtil.threeDecimal(resultBySrcBestPrecisionUsingThdValue.getF1()) + "," +
+						DecimalUtil.threeDecimal(resultBySrcBestPrecisionUsingThdValue.getThreshold()));
+				System.out.println(DecimalUtil.threeDecimal(resultBySrcBestRecallUsingThdValue.getPrecision()) + "," + 
+						DecimalUtil.threeDecimal(resultBySrcBestRecallUsingThdValue.getRecall()) + "," +
+						DecimalUtil.threeDecimal(resultBySrcBestRecallUsingThdValue.getF1()) + "," +
+						DecimalUtil.threeDecimal(resultBySrcBestRecallUsingThdValue.getThreshold()));
+				System.out.println(DecimalUtil.threeDecimal(resultBySrcBestF1UsingThdValue.getPrecision()) + "," + 
+						DecimalUtil.threeDecimal(resultBySrcBestF1UsingThdValue.getRecall()) + "," +
+						DecimalUtil.threeDecimal(resultBySrcBestF1UsingThdValue.getF1()) + "," +
+						DecimalUtil.threeDecimal(resultBySrcBestF1UsingThdValue.getThreshold()));
+				
+				Measure resultBySrcBestPrecision = tmforTar.getResultByThresholdPercentileRank(bestPrecisionResult.getPercentileRankOfThreshold());
+				Measure resultBySrcBestRecall = tmforTar.getResultByThresholdPercentileRank(bestRecallResult.getPercentileRankOfThreshold());
+				Measure resultBySrcBestF1 = tmforTar.getResultByThresholdPercentileRank(bestF1Result.getPercentileRankOfThreshold());
+				
+				System.out.println("Target results when using percentile reanks of the best P, R, F1 thresholds from source");
+				
+				System.out.println(DecimalUtil.threeDecimal(resultBySrcBestPrecision.getPrecision()) + "," + 
+						DecimalUtil.threeDecimal(resultBySrcBestPrecision.getRecall()) + "," +
+						DecimalUtil.threeDecimal(resultBySrcBestPrecision.getF1()) + "," +
+						DecimalUtil.threeDecimal(resultBySrcBestPrecision.getThreshold()));
+				System.out.println(DecimalUtil.threeDecimal(resultBySrcBestRecall.getPrecision()) + "," + 
+						DecimalUtil.threeDecimal(resultBySrcBestRecall.getRecall()) + "," +
+						DecimalUtil.threeDecimal(resultBySrcBestRecall.getF1()) + "," +
+						DecimalUtil.threeDecimal(resultBySrcBestRecall.getThreshold()));
+				System.out.println(DecimalUtil.threeDecimal(resultBySrcBestF1.getPrecision()) + "," + 
+						DecimalUtil.threeDecimal(resultBySrcBestF1.getRecall()) + "," +
+						DecimalUtil.threeDecimal(resultBySrcBestF1.getF1()) + "," +
+						DecimalUtil.threeDecimal(resultBySrcBestF1.getThreshold()));
+				
+				System.out.println("\n\n");
+				
+				
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
 		}
 		
 		// generate TREC table
