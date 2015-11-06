@@ -1,12 +1,10 @@
 package ca.uwaterloo.tool.trec;
 
 import java.io.File;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Random;
 
-import hk.ust.cse.ipam.utils.ArrayListUtil;
 import hk.ust.cse.ipam.utils.DecimalUtil;
 import hk.ust.cse.ipam.utils.HashMapUtil;
 import hk.ust.cse.ipam.utils.WekaUtils;
@@ -134,10 +132,28 @@ public class Main {
 				clsCopy.buildClassifier(src);
 				
 				// evaluate the model on itself to get precision-recall curve
-				Evaluation eval = new Evaluation(src);
-				eval.evaluateModel(clsCopy, src);
-				Instances curve = WekaUtils.getCurve(eval.predictions(), posClassValueIndex);
-				ArrayList<String> predictionResults = WekaUtils.getPrecisionRecallFmeasureFromCurve(curve);
+				Evaluation evalForSrc = new Evaluation(src);
+				evalForSrc.evaluateModel(clsCopy, src);
+				Instances srcCurve = WekaUtils.getCurve(evalForSrc.predictions(), posClassValueIndex);
+				
+				// get all thresholds from src prediction results
+				double[] srcThresholds = srcCurve.attributeToDoubleArray(srcCurve.attribute("Threshold").index());
+				
+				ArrayList<String> predictionResults = WekaUtils.getPrecisionRecallFmeasureFromCurve(srcCurve);
+				
+				// evaluate the model on the target set
+				Evaluation evalForTar = new Evaluation(src);
+				evalForTar.evaluateModel(clsCopy, tar);
+				Instances tarCurve = WekaUtils.getCurve(evalForTar.predictions(), posClassValueIndex);
+				ArrayList<String> tarPredictionResults = WekaUtils.getPrecisionRecallFmeasureFromCurve(tarCurve);
+				
+				double[] tarThreholds = srcCurve.attributeToDoubleArray(tarCurve.attribute("Threshold").index());
+				
+				// compare srcThresholds and tarThresholds using KS-test
+				// if their threshold distributions are not similar, skip this prediction
+				if(da.getKSPvalueFromR(srcThresholds, tarThreholds)<=0.05){
+					continue;
+				}
 				
 				// compute src's precision recall curve and AUCEC
 				System.out.println("Source best results by P, R, F1");
@@ -162,17 +178,10 @@ public class Main {
 									DecimalUtil.threeDecimal(bestF1Result.getThreshold()) + "\n");
 				
 				
-				// evaluate the model on the target set
-				Evaluation eval2 = new Evaluation(src);
-				eval2.evaluateModel(clsCopy, tar);
-				curve = WekaUtils.getCurve(eval2.predictions(), posClassValueIndex);
-				predictionResults = WekaUtils.getPrecisionRecallFmeasureFromCurve(curve);
-				
 				// compute tar's precision recall curve and AUCEC
-				
 				System.out.println("===Target results");
 				
-				ThresholdManager tmforTar = new ThresholdManager(predictionResults);
+				ThresholdManager tmforTar = new ThresholdManager(tarPredictionResults);
 				
 				Measure resultBySrcBestPrecisionUsingThdValue = tmforTar.getResultByThreshold(bestPrecisionResult.getThreshold());
 				Measure resultBySrcBestRecallUsingThdValue = tmforTar.getResultByThreshold(bestRecallResult.getThreshold());
