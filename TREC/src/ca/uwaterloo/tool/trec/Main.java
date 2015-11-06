@@ -221,6 +221,18 @@ public class Main {
 						DecimalUtil.threeDecimal(resultBySrcBestF1.getF1()) + "," +
 						DecimalUtil.threeDecimal(resultBySrcBestF1.getThreshold()));
 				
+				// report results using >= 0.5 threshold
+				Measure resultBy50ThdValue = tmforTar.getResultByThreshold(0.5);
+				
+				System.out.println("Target results when using 0.5 threshold");
+				
+				System.out.println(DecimalUtil.threeDecimal(resultBy50ThdValue.getPrecision()) + "," + 
+						DecimalUtil.threeDecimal(resultBy50ThdValue.getRecall()) + "," +
+						DecimalUtil.threeDecimal(resultBy50ThdValue.getF1()) + "," +
+						DecimalUtil.threeDecimal(resultBy50ThdValue.getThreshold()));
+				
+				
+				
 				System.out.println("\n\n");
 				
 				
