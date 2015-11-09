@@ -45,6 +45,7 @@ public class Main {
 	int repeat =1;
 	int folds = 2;
 	String mlAlgorithm = "weka.classifiers.functions.Logistic";
+	int currentFold = 0;
 
 	private void run(String[] args) {
 		
@@ -59,7 +60,7 @@ public class Main {
 		// if experimental, repeat n-fold cross validation for 
 		if(experimental){
 			for(int i=0; i<repeat; i++){
-
+				
 				// randomize with different seed for each iteration
 				instances.randomize(new Random(i)); 
 				instances.stratify(folds);
@@ -71,6 +72,8 @@ public class Main {
 					
 					sources.put(new File(file).getName(), tarTrain);
 					
+					currentFold = n;
+					
 					generateTRECTable(sources,tarTest);
 					
 				}
@@ -81,7 +84,7 @@ public class Main {
 	}
 	
 	private void generateTRECTable(HashMap<String,Instances> sources,Instances instances){
-				
+		
 		// preprocessing
 		instances = preprocessing(instances);
 		
@@ -99,10 +102,15 @@ public class Main {
 		for(String srcFile:scores.keySet()){
 			
 			// consider only average score is > 0. Others will have > 0.05 since KS cutoff is 0.05
-			if(scores.get(srcFile)<0)
-				continue;
+			// TODO just show all results for now
+			//if(scores.get(srcFile)<0)
+			//	continue;
 			
-			System.out.println(srcFile + " similarity=" + scores.get(srcFile));
+			// (0) target file (1) fold index
+			System.out.print(file + "," + (currentFold+1) + ",");
+			
+			// (2)src file and (3) similarity score betwen src and tar.
+			System.out.print(srcFile + "," + DecimalUtil.threeDecimal(scores.get(srcFile)) +",");
 			
 			// generate new src and tar datasets using matched attributes
 			
@@ -147,16 +155,20 @@ public class Main {
 				Instances tarCurve = WekaUtils.getCurve(evalForTar.predictions(), posClassValueIndex);
 				ArrayList<String> tarPredictionResults = WekaUtils.getPrecisionRecallFmeasureFromCurve(tarCurve);
 				
-				double[] tarThreholds = srcCurve.attributeToDoubleArray(tarCurve.attribute("Threshold").index());
+				double[] tarThreholds = tarCurve.attributeToDoubleArray(tarCurve.attribute("Threshold").index());
 				
 				// compare srcThresholds and tarThresholds using KS-test
 				// if their threshold distributions are not similar, skip this prediction
-				if(da.getKSPvalueFromR(srcThresholds, tarThreholds)<=0.05){
+				double thresholdSimilarity = da.getKSPvalueFromR(srcThresholds, tarThreholds);
+				/*if(thresholdSimilarity<=0.05){
 					continue;
-				}
+				}*/
+				
+				// (3.5) threshold similarity
+				System.out.print(DecimalUtil.threeDecimal(thresholdSimilarity) + ",");
 				
 				// compute src's precision recall curve and AUCEC
-				System.out.println("Source best results by P, R, F1");
+				//System.out.println("Source best results by\n P, R, F1, Thresholds");
 				
 				ThresholdManager tmForSrc = new ThresholdManager(predictionResults);
 				
@@ -164,22 +176,40 @@ public class Main {
 				Measure bestRecallResult = tmForSrc.processResultsToGetBestInfo(tmForSrc.IDX_RECALL);
 				Measure bestF1Result = tmForSrc.processResultsToGetBestInfo(tmForSrc.IDX_F1);
 				
-				System.out.println(DecimalUtil.threeDecimal(bestPrecisionResult.getPrecision()) + "," + 
+				// source best results by the best src Precision
+				// (4) Precision(5) Recall (6) F1 (7) Threshold
+				System.out.print(DecimalUtil.threeDecimal(bestPrecisionResult.getPrecision()) + "," + 
 									DecimalUtil.threeDecimal(bestPrecisionResult.getRecall()) + "," +
 									DecimalUtil.threeDecimal(bestPrecisionResult.getF1()) + "," +
-									DecimalUtil.threeDecimal(bestPrecisionResult.getThreshold()));
-				System.out.println(DecimalUtil.threeDecimal(bestRecallResult.getPrecision()) + "," + 
+									DecimalUtil.threeDecimal(bestPrecisionResult.getThreshold())+",");
+				// source best results by the best src Recall
+				// (8) Precision (9) Recall (10) F1 (11) Threshold
+				System.out.print(DecimalUtil.threeDecimal(bestRecallResult.getPrecision()) + "," + 
 									DecimalUtil.threeDecimal(bestRecallResult.getRecall()) + "," +
 									DecimalUtil.threeDecimal(bestRecallResult.getF1()) + "," +
-									DecimalUtil.threeDecimal(bestRecallResult.getThreshold()));
-				System.out.println(DecimalUtil.threeDecimal(bestF1Result.getPrecision()) + "," + 
+									DecimalUtil.threeDecimal(bestRecallResult.getThreshold())+",");
+				// source best results by the best src F1
+				// (12) Precision (13) Recall (14) F1 (15) Threshold
+				System.out.print(DecimalUtil.threeDecimal(bestF1Result.getPrecision()) + "," + 
 									DecimalUtil.threeDecimal(bestF1Result.getRecall()) + "," +
 									DecimalUtil.threeDecimal(bestF1Result.getF1()) + "," +
-									DecimalUtil.threeDecimal(bestF1Result.getThreshold()) + "\n");
+									DecimalUtil.threeDecimal(bestF1Result.getThreshold()) + ",");
 				
+				// report results using >= 0.5 threshold
+				Measure resultBy50ThdValueforSrc = tmForSrc.getResultByThreshold(0.5);
+				
+				//System.out.println("Source results when using 0.5 threshold\n P, R, F1, Effective Threshold");
+				
+				
+				//Source results when using 0.5 threshold
+				// (16) Precision by the best src precision (17) Recall (18) F1 (19) Threshold
+				System.out.print(DecimalUtil.threeDecimal(resultBy50ThdValueforSrc.getPrecision()) + "," + 
+						DecimalUtil.threeDecimal(resultBy50ThdValueforSrc.getRecall()) + "," +
+						DecimalUtil.threeDecimal(resultBy50ThdValueforSrc.getF1()) + "," +
+						DecimalUtil.threeDecimal(resultBy50ThdValueforSrc.getThreshold()) + ",");
 				
 				// compute tar's precision recall curve and AUCEC
-				System.out.println("===Target results");
+				//System.out.println("***Target results");
 				
 				ThresholdManager tmforTar = new ThresholdManager(tarPredictionResults);
 				
@@ -187,54 +217,65 @@ public class Main {
 				Measure resultBySrcBestRecallUsingThdValue = tmforTar.getResultByThreshold(bestRecallResult.getThreshold());
 				Measure resultBySrcBestF1UsingThdValue = tmforTar.getResultByThreshold(bestF1Result.getThreshold());
 				
-				System.out.println("Target results when using the best P, R, F1 thresholds from source");
+				//System.out.println("Target results when using the best\n P, R, F1, Thresholds");
 				
-				System.out.println(DecimalUtil.threeDecimal(resultBySrcBestPrecisionUsingThdValue.getPrecision()) + "," + 
+				// Target results when using the best src Precision
+				// (20) Precision by the best src precision (21) Recall (22) F1 (23) Threshold
+				System.out.print(DecimalUtil.threeDecimal(resultBySrcBestPrecisionUsingThdValue.getPrecision()) + "," + 
 						DecimalUtil.threeDecimal(resultBySrcBestPrecisionUsingThdValue.getRecall()) + "," +
 						DecimalUtil.threeDecimal(resultBySrcBestPrecisionUsingThdValue.getF1()) + "," +
-						DecimalUtil.threeDecimal(resultBySrcBestPrecisionUsingThdValue.getThreshold()));
-				System.out.println(DecimalUtil.threeDecimal(resultBySrcBestRecallUsingThdValue.getPrecision()) + "," + 
+						DecimalUtil.threeDecimal(resultBySrcBestPrecisionUsingThdValue.getThreshold()) + ",");
+				// Target best results by the best src Recall
+				// (24) Precision (25) Recall (26) F1 (27) Threshold
+				System.out.print(DecimalUtil.threeDecimal(resultBySrcBestRecallUsingThdValue.getPrecision()) + "," + 
 						DecimalUtil.threeDecimal(resultBySrcBestRecallUsingThdValue.getRecall()) + "," +
 						DecimalUtil.threeDecimal(resultBySrcBestRecallUsingThdValue.getF1()) + "," +
-						DecimalUtil.threeDecimal(resultBySrcBestRecallUsingThdValue.getThreshold()));
-				System.out.println(DecimalUtil.threeDecimal(resultBySrcBestF1UsingThdValue.getPrecision()) + "," + 
+						DecimalUtil.threeDecimal(resultBySrcBestRecallUsingThdValue.getThreshold()) + ",");
+				// Target best results by the best src F1
+				// (28) Precision (29) Recall (30) F1 (31) Threshold
+				System.out.print(DecimalUtil.threeDecimal(resultBySrcBestF1UsingThdValue.getPrecision()) + "," + 
 						DecimalUtil.threeDecimal(resultBySrcBestF1UsingThdValue.getRecall()) + "," +
 						DecimalUtil.threeDecimal(resultBySrcBestF1UsingThdValue.getF1()) + "," +
-						DecimalUtil.threeDecimal(resultBySrcBestF1UsingThdValue.getThreshold()));
+						DecimalUtil.threeDecimal(resultBySrcBestF1UsingThdValue.getThreshold()) + ",");
 				
 				Measure resultBySrcBestPrecision = tmforTar.getResultByThresholdPercentileRank(bestPrecisionResult.getPercentileRankOfThreshold());
 				Measure resultBySrcBestRecall = tmforTar.getResultByThresholdPercentileRank(bestRecallResult.getPercentileRankOfThreshold());
 				Measure resultBySrcBestF1 = tmforTar.getResultByThresholdPercentileRank(bestF1Result.getPercentileRankOfThreshold());
 				
-				System.out.println("Target results when using percentile reanks of the best P, R, F1 thresholds from source");
+				//System.out.println("Target results when using percentile ranks of the best\n P, R, F1, Thresholds");
 				
-				System.out.println(DecimalUtil.threeDecimal(resultBySrcBestPrecision.getPrecision()) + "," + 
+				// Target results when using percentile ranks of the best src precision
+				// (32) Precision (33) Recall (34) F1 (35) Threshold
+				System.out.print(DecimalUtil.threeDecimal(resultBySrcBestPrecision.getPrecision()) + "," + 
 						DecimalUtil.threeDecimal(resultBySrcBestPrecision.getRecall()) + "," +
 						DecimalUtil.threeDecimal(resultBySrcBestPrecision.getF1()) + "," +
-						DecimalUtil.threeDecimal(resultBySrcBestPrecision.getThreshold()));
-				System.out.println(DecimalUtil.threeDecimal(resultBySrcBestRecall.getPrecision()) + "," + 
+						DecimalUtil.threeDecimal(resultBySrcBestPrecision.getThreshold()) + ",");
+				// Target results when using percentile ranks of the best src Recall
+				// (36) Precision (37) Recall (38) F1 (39) Threshold
+				System.out.print(DecimalUtil.threeDecimal(resultBySrcBestRecall.getPrecision()) + "," + 
 						DecimalUtil.threeDecimal(resultBySrcBestRecall.getRecall()) + "," +
 						DecimalUtil.threeDecimal(resultBySrcBestRecall.getF1()) + "," +
-						DecimalUtil.threeDecimal(resultBySrcBestRecall.getThreshold()));
-				System.out.println(DecimalUtil.threeDecimal(resultBySrcBestF1.getPrecision()) + "," + 
+						DecimalUtil.threeDecimal(resultBySrcBestRecall.getThreshold()) + ",");
+				// (40) Precision (41) Recall (42) F1 (43) Threshold
+				// Target results when using percentile ranks of the best src F1
+				System.out.print(DecimalUtil.threeDecimal(resultBySrcBestF1.getPrecision()) + "," + 
 						DecimalUtil.threeDecimal(resultBySrcBestF1.getRecall()) + "," +
 						DecimalUtil.threeDecimal(resultBySrcBestF1.getF1()) + "," +
-						DecimalUtil.threeDecimal(resultBySrcBestF1.getThreshold()));
+						DecimalUtil.threeDecimal(resultBySrcBestF1.getThreshold()) + ",");
 				
 				// report results using >= 0.5 threshold
 				Measure resultBy50ThdValue = tmforTar.getResultByThreshold(0.5);
 				
-				System.out.println("Target results when using 0.5 threshold");
+				//System.out.println("Target results when using 0.5 threshold\n P, R, F1, Effective Threshold");
 				
-				System.out.println(DecimalUtil.threeDecimal(resultBy50ThdValue.getPrecision()) + "," + 
+				// Target results when using 0.5 threshold
+				// (44) Precision (45) Recall (46) F1 (47) Threshold
+				System.out.print(DecimalUtil.threeDecimal(resultBy50ThdValue.getPrecision()) + "," + 
 						DecimalUtil.threeDecimal(resultBy50ThdValue.getRecall()) + "," +
 						DecimalUtil.threeDecimal(resultBy50ThdValue.getF1()) + "," +
 						DecimalUtil.threeDecimal(resultBy50ThdValue.getThreshold()));
 				
-				
-				
-				System.out.println("\n\n");
-				
+				System.out.println();
 				
 			} catch (Exception e) {
 				e.printStackTrace();
