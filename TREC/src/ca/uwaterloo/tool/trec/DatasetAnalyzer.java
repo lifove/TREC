@@ -107,7 +107,7 @@ public class DatasetAnalyzer {
 					continue;
 				
 				double[] tarAttrValues = tarInstances.attributeToDoubleArray(tarAttrIdx);
-				double[] srcAttrValues = srcInstances.attributeToDoubleArray(tarAttrIdx);
+				double[] srcAttrValues = srcInstances.attributeToDoubleArray(srcAttrIdx);
 				
 				double pValue= getKSPvalueFromR(srcAttrValues, tarAttrValues);
 				
